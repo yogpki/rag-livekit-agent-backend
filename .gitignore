@@ -1,4 +1,20 @@
 # Byte-compiled / optimized / DLL files
+
+#rag-livekit-agent-backend
+.env.*
+recordings/
+
+# 忽略 simpleenv 文件夾中的所有內容
+simpleenv/*
+
+# 排除具體文件夾層級直到文件
+!simpleenv/Lib/
+!simpleenv/Lib/site-packages/
+!simpleenv/Lib/site-packages/livekit/
+!simpleenv/Lib/site-packages/livekit/agents/
+!simpleenv/Lib/site-packages/livekit/agents/pipeline/
+!simpleenv/Lib/site-packages/livekit/agents/pipeline/agent_playout.py
+
 __pycache__/
 *.py[cod]
 *$py.class
