@@ -1,41 +1,52 @@
-
-
 # rag-livekit-agent-backend
 
-> - livekit voice assistant agent backend
-> - streaming tts audio to a2f
-> - language input switch
-  
-  
+> **⚠️ This project is a work in progress.**  
+> - livekit voice assistant agent backend  
+> - streaming tts audio to a2f  
+> - language input switch  
 
-### re-create this project
-- prepare keys of: openai, deepgram, elevenlabs, livekit
+### Re-create this project
 
-- [Livekit CLI setup](https://docs.livekit.io/home/cli/cli-setup/) - Powershell - install livekit CLI
-    - steps:
-    ```bash
-    # install Clivekit LI
-    winget install LiveKit.LiveKitCLI
-    # authenticate with cloud
-    lk cloud auth
-    ```
+1. **Prepare API keys**  
+   OpenAI, Deepgram, ElevenLabs, and LiveKit.
 
-- [Create app from sample](https://docs.livekit.io/agents/quickstarts/voice-agent/) - Powershell - run cli to create app
-    - steps:
-    ```bash
-    # cd to root folder
-    cd [path]
+2. **Prepare Nvidia omniverse - audio2face**
+    - [Install Omniverse launcher](https://developer.nvidia.com/omniverse#section-getting-started)
+    - Install audio2face in the launcher
+    - [u2b - Setup the scene w/ blendshape osc](https://www.youtube.com/watch?v=y1wVykdmJNM)
+        ```bash
+          #shapes in \AppData\Local\ov\pkg\audio2face-2023.2.0\exts\omni.audio2face.exporter\omni\audio2face\exporter\scripts\faceSolerv.py
+          blend = ["eyeBlinkLeft", "eyeLookDownLeft", "eyeLookInLeft", "eyeLookOutLeft", "eyeLookUpLeft", "eyeSquintLeft", "eyeWideLeft", "eyeBlinkRight", "eyeLookDownRight", "eyeLookInRight", "eyeLookOutRight", "eyeLookUpRight", "eyeSquintRight", "eyeWideRight", "jawForward", "jawLeft", "jawRight", "jawOpen", "mouthClose", "mouthFunnel", "mouthPucker", "mouthLeft", "mouthRight", "mouthSmileLeft", "mouthSmileRight", "mouthFrownLeft", "mouthFrownRight", "mouthDimpleLeft", "mouthDimpleRight", "mouthStretchLeft", "mouthStretchRight", "mouthRollLower", "mouthRollUpper", "mouthShrugLower", "mouthShrugUpper", "mouthPressLeft", "mouthPressRight", "mouthLowerDownLeft", "mouthLowerDownRight", "mouthUpperUpLeft", "mouthUpperUpRight", "browDownLeft", "browDownRight", "browInnerUp", "browOuterUpLeft", "browOuterUpRight", "cheekPuff", "cheekSquintLeft", "cheekSquintRight", "noseSneerLeft", "noseSneerRight", "tongueOut"]
+        ```
+            
+3. **[Livekit CLI setup](https://docs.livekit.io/home/cli/cli-setup/)**  
+   Use Powershell to install the LiveKit CLI:
+   
+   - Steps:
+     ```bash
+     # Install LiveKit CLI
+     winget install LiveKit.LiveKitCLI
 
-    # cli create app (choose voice agent backend python)
-    lk app create
+     # Authenticate with cloud
+     lk cloud auth
+     ```
 
-    # create venev
-    python -m venv venvname
-    venvname/Scripts/Activate1.ps
+4. **[Create app from livekit sample](https://docs.livekit.io/agents/quickstarts/voice-agent/)**  
+   Use Powershell to run the CLI and create the app:
 
-    # use the requirements.txt in this repo
-    pip install -r requirements.txt
-    ```
+   - Steps:
+     ```bash
+     # Navigate to the root folder
+     cd [path]
 
+     # Use CLI to create app (select voice agent backend in Python)
+     lk app create
 
+     # Create a virtual environment
+     python -m venv venvname
+     venvname/Scripts/Activate.ps1
+
+     # Install dependencies from requirements.txt in this repo
+     pip install -r requirements.txt
+     ```
 
