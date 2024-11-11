@@ -5,8 +5,8 @@
 > - livekit voice assistant agent backend
 > - streaming tts audio to a2f
 > - language input switch
-
-
+  
+  
 
 ### re-create this project
 - prepare keys of: openai, deepgram, elevenlabs, livekit
@@ -24,8 +24,10 @@
   ```bash
   # cd to root folder
   cd [path]
+
   # cli create app (choose voice agent backend python)
   lk app create
+
   # create venev
   python -m venv venvname
   venvname/Scripts/Activate1.ps
