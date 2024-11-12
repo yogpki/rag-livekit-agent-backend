@@ -97,7 +97,11 @@ async def entrypoint(ctx: JobContext):
     agent = VoicePipelineAgent(
         chat_ctx=initial_ctx,
         vad=silero.VAD.load(),
-        stt=deepgram.STT(),
+        stt=deepgram.STT(
+            language="zh-CN",           # 可选，设置为 `None` 以启用自动检测
+            detect_language=False     # 启用语言检测 # streamming 不能用detect
+        ),
+
         llm=openai.LLM(),
         allow_interruptions=False,
         tts=elevenlabs.TTS(voice=custom_voice,

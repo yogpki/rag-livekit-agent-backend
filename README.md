@@ -55,7 +55,7 @@
 ### Notes
 - Capturing audio data from the voice agent and streaming them to a2f at 
     `simpleenv\Lib\site-packages\livekit\agents\pipeline\agent_playout.py`
-- Currently the original audio playout is deleted. So it is a must to run the a2f streaming usd file since the streaming needs a destination.
+- Currently the original audio playout is deleted, which means the voice agent's TTS is not functioning. Instead the audio is read out in a2f, so it is a must to run the a2f streaming usd file since the streaming needs a destination.
 
 ### Code reference
-- a2f streaming function reference at `\AppData\Local\ov\pkg\audio2face-2023.2.0\exts\omni.audio2face.player\omni\audio2face\player\scripts\streaming_server\test_client.py`. Use it and modify the push_audio_track_stream function at agent_playout.py, so that it can send the start_market at first frame and send the rest audio to a2f.
+- a2f streaming function reference at `\AppData\Local\ov\pkg\audio2face-2023.2.0\exts\omni.audio2face.player\omni\audio2face\player\scripts\streaming_server\test_client.py`. The current `agent_playout.py` is referenceing the push_audio_track_stream function from `test_client.py` (modified), so that it can send the start_market at first frame and send the rest audio to a2f in _capture_task function.
