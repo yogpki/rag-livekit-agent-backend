@@ -59,3 +59,9 @@
 
 ### Code reference
 - a2f streaming function reference at `\AppData\Local\ov\pkg\audio2face-2023.2.0\exts\omni.audio2face.player\omni\audio2face\player\scripts\streaming_server\test_client.py`. The current `agent_playout.py` is referenceing the push_audio_track_stream function from `test_client.py` (modified), so that it can send the start_market at first frame and send the rest audio to a2f in _capture_task function.
+
+### To run
+
+  ```bash
+  python main_agent.py dev
+  ```
