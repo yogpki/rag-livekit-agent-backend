@@ -13,11 +13,16 @@ logger = logging.getLogger("rag-assistant")
 annoy_index = rag.annoy.AnnoyIndex.load("vdb_data")  # see build_data.py
 load_dotenv(dotenv_path=".env.local")
 embeddings_dimension = 1536 #1536
-with open("data/my_data.pkl", "rb") as f:
+with open("data/data_1118.pkl", "rb") as f:
     paragraphs_by_uuid = pickle.load(f)
 
     # Specify the path to your text file
 file_path = 'data/system_prompt.txt'
+#file_path = 'data/andy_system_1.txt'
+#file_path = 'data/andy_system_2.txt'
+#file_path = 'data/andy_system_3.txt'
+#file_path = 'data/andy_system_4.txt'
+#file_path = 'data/andy_system_5.txt'
 
 # Open the file in read mode and read the content into a string
 with open(file_path, 'r', encoding='utf-8') as file:
@@ -28,7 +33,7 @@ with open(file_path, 'r', encoding='utf-8') as file:
 async def entrypoint(ctx: JobContext):
     # 创建 VoiceSettings 对象
     voice_settings = elevenlabs.VoiceSettings(
-        stability=0.3, 
+        stability=0.8, 
         similarity_boost=0.5, 
         style=0.6, 
         use_speaker_boost=True
@@ -97,8 +102,8 @@ async def entrypoint(ctx: JobContext):
     agent = VoicePipelineAgent(
         chat_ctx=initial_ctx,
         vad=silero.VAD.load(),
-        stt=deepgram.STT(
-            language="zh-CN",           # 可选，设置为 `None` 以启用自动检测
+        stt=openai.STT(
+            language="en",           # 可选，设置为 `None` 以启用自动检测
             detect_language=False     # 启用语言检测 # streamming 不能用detect
         ),
 

@@ -11,7 +11,7 @@ from tqdm import tqdm
 # from this blog https://openai.com/index/new-embedding-models-and-api-updates/
 # 512 seems to provide good MTEB score with text-embedding-3-small
 embeddings_dimension = 1536
-raw_data = open("data/raw_data.txt", "r", encoding="utf-8").read()
+raw_data = open("data/data-1118.txt", "r", encoding="utf-8").read()
 
 
 load_dotenv(dotenv_path=".env.local")
@@ -44,7 +44,7 @@ async def main() -> None:
         idx_builder.save("vdb_data")
 
         # save data with pickle
-        with open("data/my_data.pkl", "wb") as f:
+        with open("data/data_1118.pkl", "wb") as f:
             pickle.dump(paragraphs_by_uuid, f)
 
 
