@@ -56,6 +56,9 @@ class EntryDriver:
             return accumulate_and_print_source(tts_source)
     
         async def _enrich_with_rag(agent: VoicePipelineAgent, chat_ctx: llm.ChatContext):
+            stt_text = chat_ctx.messages[-1].content
+            logger.info(f"Original STT text: {stt_text}")
+
             # RAG retrieval and context update logic
             user_msg = chat_ctx.messages[-1]
             user_embedding = await openai.create_embeddings(
@@ -85,9 +88,9 @@ class EntryDriver:
 
         # 创建 VoiceSettings 对象
         voice_settings = elevenlabs.VoiceSettings(
-            stability=0.8, 
+            stability=0.4, 
             similarity_boost=0.5, 
-            style=0.6, 
+            style=0.2, 
             use_speaker_boost=True
         )
 
@@ -104,6 +107,7 @@ class EntryDriver:
             chat_ctx=initial_ctx,
             vad=silero.VAD.load(),
             stt=openai.STT(language="en", detect_language=False),
+            allow_interruptions = False,
             llm=openai.LLM(),
             tts=elevenlabs.TTS(voice=custom_voice, encoding="pcm_24000"),
             before_llm_cb=_enrich_with_rag,
