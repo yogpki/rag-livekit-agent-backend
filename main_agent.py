@@ -12,7 +12,7 @@ from typing import Any, Union, AsyncIterable, Awaitable, Callable, Literal, Opti
 from pythonosc import dispatcher, osc_server
 import threading
 import time
-from pynput import keyboard
+import json
 
 logger = logging.getLogger("rag-assistant")
 
@@ -27,6 +27,15 @@ system_prompt_path = 'data/system_prompt.txt'
 with open(system_prompt_path, 'r', encoding='utf-8') as file:
     system_prompt = file.read()
 
+
+try:
+    with(open("keys.json")) as fp:
+        key_dict = json.load(fp)
+except FileNotFoundError as e:
+    key_dict = {}
+grop_key = key_dict.get("grop")
+
+
 class EntryDriver:
     def __init__(self):
         self.agent = None  # Initialize agent attribute
@@ -34,34 +43,7 @@ class EntryDriver:
         self.osc_server_running = False  # Flag to track OSC server status
         self.space_pressed = False  # 用于跟踪空格键是否被按下
     
-    def start_keyboard_listener(self):
-        
-        logger.debug("开始全局监听键盘事件")
-        
-        def on_press(key):
-            try:
-                if key == keyboard.Key.space and not self.space_pressed:
-                    self.space_pressed = True
-                    if self.agent is not None:
-                        self.agent.set_speakbtn_status(True)
-                        print("self.agent." + str(self.agent.is_speakbtn_on))
-                   
-            except AttributeError:
-                pass
-
-        def on_release(key):
-            try:
-                if key == keyboard.Key.space and self.space_pressed:
-                    self.space_pressed = False
-                    if self.agent is not None:
-                        self.agent.set_speakbtn_status(False)
-                        print("self.agent." + str(self.agent.is_speakbtn_on))
-            except AttributeError:
-                pass
-
-        # 启动监听器
-        listener = keyboard.Listener(on_press=on_press, on_release=on_release)
-        listener.start()
+    
 
     async def entrypoint(self, ctx: JobContext):
         # Store context to use in reset
@@ -137,7 +119,7 @@ class EntryDriver:
         self.agent = VoicePipelineAgent(
             chat_ctx=initial_ctx,
             vad=silero.VAD.load(),
-            stt=openai.STT(language="en", detect_language=False),
+            stt=openai.STT.with_groq(language="yue", detect_language=False, api_key=grop_key), #only with grop cloud that can use large-v3 to use cantonese
             allow_interruptions = False,
             llm=openai.LLM(),
             tts=elevenlabs.TTS(voice=custom_voice, encoding="pcm_24000"),
@@ -163,8 +145,8 @@ class EntryDriver:
         # 配置 OSC 分派器
         disp = dispatcher.Dispatcher()
       
-        disp.map("/mand", self.on_chinese)   
-        disp.map("/can", self.on_chinese)   
+        disp.map("/mand", self.on_mandarin)   
+        disp.map("/can", self.on_cantonese)   
         disp.map("/en", self.on_english) 
 
         disp.map("/hold", self.on_hold_to_speak) 
@@ -175,18 +157,25 @@ class EntryDriver:
         print("OSC Server is running on port 5566")
         server.serve_forever()
     
-    def on_chinese(self, address, *args):
-        
-        print("Received /mand or /can OSC message!")
-        logger.info("Received /mand or /can OSC message!")
+    def on_mandarin(self, address, *args):
+        print("Received /mand OSC message!")
+        logger.info("Received /mand OSC message!")
         # Run reset asynchronously
         if self.agent is not None and self.agent.stt is not None:
             self.agent.stt._stt._opts.language = "zh"  
             logger.info("self.agent.stt._opts.language = zh")
             print("self.agent.stt._opts.language = zh")
+    
+    def on_cantonese(self, address, *args):
+        print("Received /can OSC message!")
+        logger.info("Received /can OSC message!")
+        # Run reset asynchronously
+        if self.agent is not None and self.agent.stt is not None:
+            self.agent.stt._stt._opts.language = "yue"  
+            logger.info("self.agent.stt._opts.language = yue")
+            print("self.agent.stt._opts.language = yue")
 
     def on_english(self, address, *args):
-        
         print("Received /en OSC message!")
         logger.info("Received /en OSC message!")
         # Run reset asynchronously
@@ -202,7 +191,7 @@ class EntryDriver:
         
         if self.agent is not None:
             self.agent.set_speakbtn_status(True)
-            print("self.agent." + str(self.agent.is_speakbtn_on))
+            print("self.agent." + str(self.agent.is_speakbtn_hold))
 
     def on_release(self, address, *args):
       
@@ -211,11 +200,10 @@ class EntryDriver:
         
         if self.agent is not None:
             self.agent.set_speakbtn_status(False)
-            print("self.agent." + str(self.agent.is_speakbtn_on))
+            print("self.agent." + str(self.agent.is_speakbtn_hold))
 
     def run(self):
-        # 在单独的线程中启动键盘监听器
-        threading.Thread(target=self.start_keyboard_listener, daemon=True).start()
+       
         cli.run_app(WorkerOptions(entrypoint_fnc=self.entrypoint))
 
 
