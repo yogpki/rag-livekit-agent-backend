@@ -12,6 +12,7 @@ from typing import Any, Union, AsyncIterable, Awaitable, Callable, Literal, Opti
 from pythonosc import dispatcher, osc_server
 import threading
 import time
+from pynput import keyboard
 
 logger = logging.getLogger("rag-assistant")
 
@@ -31,6 +32,36 @@ class EntryDriver:
         self.agent = None  # Initialize agent attribute
         self.ctx = None  # Store JobContext for potential reinitialization
         self.osc_server_running = False  # Flag to track OSC server status
+        self.space_pressed = False  # 用于跟踪空格键是否被按下
+    
+    def start_keyboard_listener(self):
+        
+        logger.debug("开始全局监听键盘事件")
+        
+        def on_press(key):
+            try:
+                if key == keyboard.Key.space and not self.space_pressed:
+                    self.space_pressed = True
+                    if self.agent is not None:
+                        self.agent.set_speakbtn_status(True)
+                        print("self.agent." + str(self.agent.is_speakbtn_on))
+                   
+            except AttributeError:
+                pass
+
+        def on_release(key):
+            try:
+                if key == keyboard.Key.space and self.space_pressed:
+                    self.space_pressed = False
+                    if self.agent is not None:
+                        self.agent.set_speakbtn_status(False)
+                        print("self.agent." + str(self.agent.is_speakbtn_on))
+            except AttributeError:
+                pass
+
+        # 启动监听器
+        listener = keyboard.Listener(on_press=on_press, on_release=on_release)
+        listener.start()
 
     async def entrypoint(self, ctx: JobContext):
         # Store context to use in reset
@@ -63,7 +94,7 @@ class EntryDriver:
             user_msg = chat_ctx.messages[-1]
             user_embedding = await openai.create_embeddings(
                 input=[user_msg.content],
-                model="text-embedding-3-large",
+                model="text-embedding-3-small",
                 dimensions=embeddings_dimension,
             )
             result = annoy_index.query(user_embedding[0].embedding, n=1)[0]
@@ -136,13 +167,16 @@ class EntryDriver:
         disp.map("/can", self.on_chinese)   
         disp.map("/en", self.on_english) 
 
+        disp.map("/hold", self.on_hold_to_speak) 
+        disp.map("/release", self.on_release) 
+
         # 設置 OSC 服務器
         server = osc_server.ThreadingOSCUDPServer(("127.0.0.1", 5566), disp)
         print("OSC Server is running on port 5566")
         server.serve_forever()
     
     def on_chinese(self, address, *args):
-        """Trigger reset when receiving /mand or /can OSC message."""
+        
         print("Received /mand or /can OSC message!")
         logger.info("Received /mand or /can OSC message!")
         # Run reset asynchronously
@@ -152,7 +186,7 @@ class EntryDriver:
             print("self.agent.stt._opts.language = zh")
 
     def on_english(self, address, *args):
-        """Trigger reset when receiving /en OSC message."""
+        
         print("Received /en OSC message!")
         logger.info("Received /en OSC message!")
         # Run reset asynchronously
@@ -161,8 +195,27 @@ class EntryDriver:
             logger.info("self.agent.stt._opts.language = en")
             print("self.agent.stt._opts.language = en")
 
+    def on_hold_to_speak(self, address, *args):
+        
+        print("Received /hold OSC message!")
+        logger.info("Received /hold OSC message!")
+        
+        if self.agent is not None:
+            self.agent.set_speakbtn_status(True)
+            print("self.agent." + str(self.agent.is_speakbtn_on))
+
+    def on_release(self, address, *args):
+      
+        print("Received /release OSC message!")
+        logger.info("Received /release OSC message!")
+        
+        if self.agent is not None:
+            self.agent.set_speakbtn_status(False)
+            print("self.agent." + str(self.agent.is_speakbtn_on))
 
     def run(self):
+        # 在单独的线程中启动键盘监听器
+        threading.Thread(target=self.start_keyboard_listener, daemon=True).start()
         cli.run_app(WorkerOptions(entrypoint_fnc=self.entrypoint))
 
 
@@ -171,3 +224,4 @@ if __name__ == "__main__":
     entry_driver = EntryDriver()
     entry_driver.run()
 
+   
