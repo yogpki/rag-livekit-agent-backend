@@ -20,7 +20,7 @@ logger = logging.getLogger("rag-assistant")
 annoy_index = rag.annoy.AnnoyIndex.load("vdb_data")
 load_dotenv(dotenv_path=".env.local")
 embeddings_dimension = 1536
-with open("data/data_1118_large.pkl", "rb") as f:
+with open("data/data_1118_small.pkl", "rb") as f:
     paragraphs_by_uuid = pickle.load(f)
 
 system_prompt_path = 'data/system_prompt.txt'
@@ -73,7 +73,9 @@ class EntryDriver:
             accumulated_text = ""  # 用於累積所有處理過的文本
 
             async for chunk in tts_source:
-                print(chunk)
+                # 累積捕獲到的內容
+                accumulated_text += chunk
+                #print(chunk)
                 if not capture:
                     if "@" in chunk:
                         # 找到第一個 "@"，開始捕獲，保留其後的內容
@@ -91,8 +93,7 @@ class EntryDriver:
                     yield chunk  # 返回最後一部分
                     break  # 停止捕獲
 
-                # 累積捕獲到的內容
-                accumulated_text += chunk
+                
                 yield chunk  # 將處理後的文本返回
 
             # 當所有內容處理完成後，一次性記錄累積的文本
@@ -114,7 +115,7 @@ class EntryDriver:
     
         
         pre_txt = "Question: "
-        post_txt = "\n1. Topic categorization [related or partially related or unrelated]: \n2. Response tone [happy or sad or confused or neutral]: \n3. Response [english]:\n4. Translation of the response [traditional chinese (zh-hk)]: "
+        post_txt = r"\n1. Topic categorization [#related or partially related or unrelated#]: \n2. Response tone [%happy or sad or confused or neutral%]: \n3. Response [@english@]:\n4. Translation of the response [*traditional chinese (zh-hk)*]: "
 
         async def _enrich_with_rag(agent: VoicePipelineAgent, chat_ctx: llm.ChatContext):
             stt_text = chat_ctx.messages[-1].content
@@ -126,7 +127,7 @@ class EntryDriver:
             user_msg_txt_for_embedding = user_msg_txt_for_embedding.replace("your", "your (Friska's)")
             user_embedding = await openai.create_embeddings(
                 input=[user_msg_txt_for_embedding],
-                model="text-embedding-3-large",
+                model="text-embedding-3-small",
                 dimensions=embeddings_dimension,
             )
             result = annoy_index.query(user_embedding[0].embedding, n=1)[0]
@@ -145,8 +146,8 @@ class EntryDriver:
                 
                 
 
-            logger.info(f"rag_msg: {rag_msg}")
-            logger.info(f"chat_ctx.messages[-1]: {chat_ctx.messages[-1]}")
+            #logger.info(f"rag_msg: {rag_msg}")
+            #logger.info(f"chat_ctx.messages[-1]: {chat_ctx.messages[-1]}")
             #return agent.llm.chat(chat_ctx=chat_ctx)
             
             

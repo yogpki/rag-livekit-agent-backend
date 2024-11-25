@@ -20,7 +20,7 @@ async def _create_embeddings(
 ) -> openai.EmbeddingData:
     results = await openai.create_embeddings(
         input=[input],
-        model="text-embedding-3-large",
+        model="text-embedding-3-small",
         dimensions=embeddings_dimension,
         http_session=http_session,
     )
@@ -44,7 +44,7 @@ async def main() -> None:
         idx_builder.save("vdb_data")
 
         # save data with pickle
-        with open("data/data_1118_large.pkl", "wb") as f:
+        with open("data/data_1118_small.pkl", "wb") as f:
             pickle.dump(paragraphs_by_uuid, f)
 
 
