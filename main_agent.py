@@ -20,7 +20,7 @@ logger = logging.getLogger("rag-assistant")
 annoy_index = rag.annoy.AnnoyIndex.load("vdb_data")
 load_dotenv(dotenv_path=".env.local")
 embeddings_dimension = 1536
-with open("data/data_1118.pkl", "rb") as f:
+with open("data/data_1118_large.pkl", "rb") as f:
     paragraphs_by_uuid = pickle.load(f)
 
 system_prompt_path = 'data/system_prompt.txt'
@@ -34,6 +34,7 @@ try:
 except FileNotFoundError as e:
     key_dict = {}
 grop_key = key_dict.get("grop")
+model_id = key_dict.get("model_id")
 
 
 class EntryDriver:
@@ -49,7 +50,14 @@ class EntryDriver:
         # Store context to use in reset
         self.ctx = ctx
 
-        
+        initial_ctx = llm.ChatContext().append(
+            role="system",
+            text=(
+                system_prompt
+            ),
+        )
+
+        await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
 
         def before_tts_cb(agent: VoicePipelineAgent, tts_source: Union[str, AsyncIterable[str]]) -> Union[str, AsyncIterable[str]]:
             # 檢查 tts_source 是否為字符串
@@ -68,15 +76,21 @@ class EntryDriver:
 
             return accumulate_and_print_source(tts_source)
     
+        
+        pre_txt = "Question: "
+        post_txt = "\n1. Topic categorization [related or partially related or unrelated]: \n2. Response tone [happy or sad or confused or neutral]: \n3. Response [english]:\n4. Translation of the response [traditional chinese (zh-hk)]: "
+
         async def _enrich_with_rag(agent: VoicePipelineAgent, chat_ctx: llm.ChatContext):
             stt_text = chat_ctx.messages[-1].content
             logger.info(f"Original STT text: {stt_text}")
 
             # RAG retrieval and context update logic
             user_msg = chat_ctx.messages[-1]
+            user_msg_txt_for_embedding = chat_ctx.messages[-1].content.replace("you", "you (Friska)")
+            user_msg_txt_for_embedding = user_msg_txt_for_embedding.replace("your", "your (Friska's)")
             user_embedding = await openai.create_embeddings(
-                input=[user_msg.content],
-                model="text-embedding-3-small",
+                input=[user_msg_txt_for_embedding],
+                model="text-embedding-3-large",
                 dimensions=embeddings_dimension,
             )
             result = annoy_index.query(user_embedding[0].embedding, n=1)[0]
@@ -87,17 +101,22 @@ class EntryDriver:
                     text="Context:\n" + paragraph,
                     role="assistant",
                 )
-                chat_ctx.messages[-1] = rag_msg
-                chat_ctx.messages.append(user_msg)
+                #chat_ctx.messages[-1] = rag_msg
+                #chat_ctx.messages.append(user_msg)
 
-        initial_ctx = llm.ChatContext().append(
-            role="system",
-            text=(
-                system_prompt
-            ),
-        )
+                modified_text = paragraph + "\n" + pre_txt + user_msg.content + post_txt
+                chat_ctx.messages[-1].content = modified_text
+                
+                
 
-        await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
+            logger.info(f"rag_msg: {rag_msg}")
+            logger.info(f"chat_ctx.messages[-1]: {chat_ctx.messages[-1]}")
+            #return agent.llm.chat(chat_ctx=chat_ctx)
+            
+            
+
+
+        
 
         # 创建 VoiceSettings 对象
         voice_settings = elevenlabs.VoiceSettings(
@@ -121,7 +140,7 @@ class EntryDriver:
             vad=silero.VAD.load(),
             stt=openai.STT.with_groq(language="yue", detect_language=False, api_key=grop_key), #only with grop cloud that can use large-v3 to use cantonese
             allow_interruptions = False,
-            llm=openai.LLM(),
+            llm=openai.LLM(model=model_id),
             tts=elevenlabs.TTS(voice=custom_voice, encoding="pcm_24000"),
             before_llm_cb=_enrich_with_rag,
             before_tts_cb=before_tts_cb  # 传递自定义的 before_tts_cb 回调

@@ -44,7 +44,7 @@ async def main() -> None:
         idx_builder.save("vdb_data")
 
         # save data with pickle
-        with open("data/data_1118.pkl", "wb") as f:
+        with open("data/data_1118_large.pkl", "wb") as f:
             pickle.dump(paragraphs_by_uuid, f)
 
 
