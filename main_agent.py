@@ -59,22 +59,58 @@ class EntryDriver:
 
         await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
 
-        def before_tts_cb(agent: VoicePipelineAgent, tts_source: Union[str, AsyncIterable[str]]) -> Union[str, AsyncIterable[str]]:
-            # 檢查 tts_source 是否為字符串
+        
+        stop_strings = ["@"]
+
+        async def process_and_accumulate_tts_source(tts_source: AsyncIterable[str]) -> AsyncIterable[str]:
+            """
+            處理 tts_source 的異步生成器，執行以下操作：
+            1. 捕獲 "3. Response:" 後的內容。
+            2. 在發現停止字符串時截斷。
+            3. 累積並記錄所有內容。
+            """
+            capture = False  # 用於標記是否開始捕獲 "&&" 後的內容
+            accumulated_text = ""  # 用於累積所有處理過的文本
+
+            async for chunk in tts_source:
+                print(chunk)
+                if not capture:
+                    if "@" in chunk:
+                        # 找到第一個 "@"，開始捕獲，保留其後的內容
+                        capture = True
+                        chunk = chunk.split("@", 1)[1]  # 提取 "@" 之後的部分
+                    else:
+                        # 如果未找到 "@"，跳過當前 chunk
+                        continue
+
+                # 如果捕獲已經開始，檢查是否遇到第二個 "@"
+                if capture and "@" in chunk:
+                    # 找到第二個 "@"，截斷到它之前並結束
+                    chunk = chunk.split("@", 1)[0]
+                    accumulated_text += chunk
+                    yield chunk  # 返回最後一部分
+                    break  # 停止捕獲
+
+                # 累積捕獲到的內容
+                accumulated_text += chunk
+                yield chunk  # 將處理後的文本返回
+
+            # 當所有內容處理完成後，一次性記錄累積的文本
+            logger.info(f"TTS Input Accumulated and Processed Content: {accumulated_text}")
+
+        def before_tts_cb(agent: "VoicePipelineAgent", tts_source: Union[str, AsyncIterable[str]]) -> Union[str, AsyncIterable[str]]:
+            """
+            綜合功能的回調函數：
+            1. 當 tts_source 是字符串時，直接記錄並返回。
+            2. 當 tts_source 是異步生成器時，進行處理和記錄。
+            """
             if isinstance(tts_source, str):
+                # 如果是字符串，記錄內容，無需處理，直接返回
                 logger.info(f"TTS Input Content: {tts_source}")
                 return tts_source
 
-            # 當 tts_source 是異步生成器時，累積內容並一次性打印
-            async def accumulate_and_print_source(source: AsyncIterable[str]) -> AsyncIterable[str]:
-                accumulated_text = ""
-                async for text in source:
-                    accumulated_text += text  # 累積文本
-                    yield text  # 繼續生成 tts_source 的內容
-                # 當所有文本累積完成後一次性打印
-                logger.info(f"TTS Input Accumulated Content: {accumulated_text}")
-
-            return accumulate_and_print_source(tts_source)
+            # 如果是異步生成器，進行內容處理
+            return process_and_accumulate_tts_source(tts_source)
     
         
         pre_txt = "Question: "
