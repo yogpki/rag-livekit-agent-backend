@@ -9,11 +9,11 @@ import tkinter as tk
 import asyncio
 from typing import Any, Union, AsyncIterable, Awaitable, Callable, Literal, Optional, Union
 
-from pythonosc import dispatcher, osc_server
+from pythonosc import dispatcher, osc_server, udp_client
 import threading
 import time
 import json
-
+import re
 logger = logging.getLogger("rag-assistant")
 
 # Load data
@@ -42,7 +42,10 @@ class EntryDriver:
         self.agent = None  # Initialize agent attribute
         self.ctx = None  # Store JobContext for potential reinitialization
         self.osc_server_running = False  # Flag to track OSC server status
-        self.space_pressed = False  # 用于跟踪空格键是否被按下
+        
+
+        # 创建 OSC 客户端，目标地址为 localhost:5567
+        self.osc_client = udp_client.SimpleUDPClient("127.0.0.1", 5567)
     
     
 
@@ -60,51 +63,68 @@ class EntryDriver:
         await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
 
         
-        stop_strings = ["@"]
-
         async def process_and_accumulate_tts_source(tts_source: AsyncIterable[str]) -> AsyncIterable[str]:
-            """
-            處理 tts_source 的異步生成器，執行以下操作：
-            1. 捕獲 "3. Response:" 後的內容。
-            2. 在發現停止字符串時截斷。
-            3. 累積並記錄所有內容。
-            """
-            capture = False  # 用於標記是否開始捕獲 "&&" 後的內容
-            accumulated_text = ""  # 用於累積所有處理過的文本
+            buffer = ""  # 用于累积 chunk
+            response_chi = ""
+            response_eng = ""
 
             async for chunk in tts_source:
-                # 累積捕獲到的內容
-                accumulated_text += chunk
-                #print(chunk)
-                if not capture:
-                    if "@" in chunk:
-                        # 找到第一個 "@"，開始捕獲，保留其後的內容
-                        capture = True
-                        chunk = chunk.split("@", 1)[1]  # 提取 "@" 之後的部分
-                    else:
-                        # 如果未找到 "@"，跳過當前 chunk
-                        continue
+                #chunk = chunk.strip()  # 去掉多余的空白字符
+                if not chunk:
+                    continue
 
-                # 如果捕獲已經開始，檢查是否遇到第二個 "@"
-                if capture and "@" in chunk:
-                    # 找到第二個 "@"，截斷到它之前並結束
-                    chunk = chunk.split("@", 1)[0]
-                    accumulated_text += chunk
-                    yield chunk  # 返回最後一部分
-                    break  # 停止捕獲
+                buffer += chunk  # 将当前 chunk 添加到缓冲区
+
+                # 检查是否能捕获 Categorization
+                if "#" in buffer:
+                    categorization_match = re.search(r"#(.*?)#", buffer)
+                    if categorization_match:
+                        categorization = categorization_match.group(1).strip()
+                        print(f"Categorization: {categorization}")
+                        buffer = buffer.split("#", 2)[-1]  # 移除已处理的部分
+
+                # 检查是否能捕获 Response Tone
+                if "%" in buffer:
+                    tone_match = re.search(r"%(.*?)%", buffer)
+                    if tone_match:
+                        response_tone = tone_match.group(1).strip()
+                        print(f"Response Tone: {response_tone}")
+                        buffer = buffer.split("%", 2)[-1]  # 移除已处理的部分
+
+                # 检查是否能捕获 Response English
+                if "@" in buffer:
+                    response_eng_match = re.search(r"@(.*?)@", buffer, re.DOTALL)
+                    if response_eng_match:
+                        response_eng = response_eng_match.group(1).strip()
+                        print(f"Response English: {response_eng}")
+
+                        buffer = buffer.split("@", 2)[-1]  # 移除已处理的部分
+                        # Yield 逐块返回英文响应
+                        for line in response_eng.splitlines():
+                            yield line.strip()
+
+                # 检查是否能捕获 Response Chinese
+                if "$" in buffer:
+                    response_chi_match = re.search(r"\$(.*?)\$", buffer, re.DOTALL)
+                    if response_chi_match:
+                        response_chi = response_chi_match.group(1).strip()
+                        print(f"Response Chinese: {response_chi}")
+                        
+                        # 发送 OSC 消息到 /response 地址
+                        self.osc_client.send_message("/response", str(response_eng+"\n"+response_chi))
+
+                        buffer = buffer.split("$", 2)[-1]  # 移除已处理的部分
 
                 
-                yield chunk  # 將處理後的文本返回
 
-            # 當所有內容處理完成後，一次性記錄累積的文本
-            logger.info(f"TTS Input Accumulated and Processed Content: {accumulated_text}")
+            # 打印缓冲区中剩余的未处理内容（如果有的话）
+            if buffer.strip():
+                print(f"Unprocessed Buffer: {buffer.strip()}")
+
+
+
 
         def before_tts_cb(agent: "VoicePipelineAgent", tts_source: Union[str, AsyncIterable[str]]) -> Union[str, AsyncIterable[str]]:
-            """
-            綜合功能的回調函數：
-            1. 當 tts_source 是字符串時，直接記錄並返回。
-            2. 當 tts_source 是異步生成器時，進行處理和記錄。
-            """
             if isinstance(tts_source, str):
                 # 如果是字符串，記錄內容，無需處理，直接返回
                 logger.info(f"TTS Input Content: {tts_source}")
@@ -115,11 +135,14 @@ class EntryDriver:
     
         
         pre_txt = "Question: "
-        post_txt = r"\n1. Topic categorization [#related or partially related or unrelated#]: \n2. Response tone [%happy or sad or confused or neutral%]: \n3. Response [@english@]:\n4. Translation of the response [*traditional chinese (zh-hk)*]: "
+        post_txt = r"\n1. Topic categorization [related or partially related or unrelated]: \n2. Response tone [happy or sad or confused or neutral]: \n3. Response [english]:\n4. Translation of the response [traditional chinese]: "
 
         async def _enrich_with_rag(agent: VoicePipelineAgent, chat_ctx: llm.ChatContext):
             stt_text = chat_ctx.messages[-1].content
             logger.info(f"Original STT text: {stt_text}")
+
+            # 发送 OSC 消息到 /chi 地址
+            self.osc_client.send_message("/input", str(stt_text).strip())
 
             # RAG retrieval and context update logic
             user_msg = chat_ctx.messages[-1]
