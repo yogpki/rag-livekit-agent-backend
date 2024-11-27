@@ -20,7 +20,7 @@ logger = logging.getLogger("rag-assistant")
 annoy_index = rag.annoy.AnnoyIndex.load("vdb_data")
 load_dotenv(dotenv_path=".env.local")
 embeddings_dimension = 1536
-with open("data/data_1118_small.pkl", "rb") as f:
+with open("data/data_1118_large.pkl", "rb") as f:
     paragraphs_by_uuid = pickle.load(f)
 
 system_prompt_path = 'data/system_prompt.txt'
@@ -46,7 +46,8 @@ class EntryDriver:
 
         # 创建 OSC 客户端，目标地址为 localhost:5567
         self.osc_client = udp_client.SimpleUDPClient("127.0.0.1", 5567)
-    
+
+        self.is_speakbtn_hold = False
     
 
     async def entrypoint(self, ctx: JobContext):
@@ -76,7 +77,7 @@ class EntryDriver:
                 buffer += chunk  # 将当前 chunk 添加到缓冲区
 
                 # 检查是否能捕获 Categorization
-                if "#" in buffer:
+                if ": #" in buffer:
                     categorization_match = re.search(r"#(.*?)#", buffer)
                     if categorization_match:
                         categorization = categorization_match.group(1).strip()
@@ -84,7 +85,7 @@ class EntryDriver:
                         buffer = buffer.split("#", 2)[-1]  # 移除已处理的部分
 
                 # 检查是否能捕获 Response Tone
-                if "%" in buffer:
+                if ": %" in buffer:
                     tone_match = re.search(r"%(.*?)%", buffer)
                     if tone_match:
                         response_tone = tone_match.group(1).strip()
@@ -92,7 +93,7 @@ class EntryDriver:
                         buffer = buffer.split("%", 2)[-1]  # 移除已处理的部分
 
                 # 检查是否能捕获 Response English
-                if "@" in buffer:
+                if ": @" in buffer:
                     response_eng_match = re.search(r"@(.*?)@", buffer, re.DOTALL)
                     if response_eng_match:
                         response_eng = response_eng_match.group(1).strip()
@@ -104,7 +105,7 @@ class EntryDriver:
                             yield line.strip()
 
                 # 检查是否能捕获 Response Chinese
-                if "$" in buffer:
+                if ": $" in buffer:
                     response_chi_match = re.search(r"\$(.*?)\$", buffer, re.DOTALL)
                     if response_chi_match:
                         response_chi = response_chi_match.group(1).strip()
@@ -134,29 +135,38 @@ class EntryDriver:
             return process_and_accumulate_tts_source(tts_source)
     
         
-        pre_txt = "Question: "
-        post_txt = r"\n1. Topic categorization [related or partially related or unrelated]: \n2. Response tone [happy or sad or confused or neutral]: \n3. Response [english]:\n4. Translation of the response [traditional chinese]: "
+        pre_txt = "User input: "
+        post_txt = r"\n\n1. Topic categorization [#related or partially related or unrelated#]:  \n2. Response tone [%happy or sad or confused or neutral%]: \n3. Response [@english@]:\n4. Translation of the response [$traditional chinese$]:"
 
         async def _enrich_with_rag(agent: VoicePipelineAgent, chat_ctx: llm.ChatContext):
             stt_text = chat_ctx.messages[-1].content
+
             logger.info(f"Original STT text: {stt_text}")
 
+            modified_stt_text = stt_text.replace("Hallo", "Hello")
+            modified_stt_text = modified_stt_text.replace("Halo", "Hello")
+            modified_stt_text = modified_stt_text.replace("halo", "hello")
+            modified_stt_text = modified_stt_text.replace("HALO", "Hello")
+
             # 发送 OSC 消息到 /chi 地址
-            self.osc_client.send_message("/input", str(stt_text).strip())
+            self.osc_client.send_message("/input", str(modified_stt_text).strip())
 
             # RAG retrieval and context update logic
             user_msg = chat_ctx.messages[-1]
             user_msg_txt_for_embedding = chat_ctx.messages[-1].content.replace("you", "you (Friska)")
             user_msg_txt_for_embedding = user_msg_txt_for_embedding.replace("your", "your (Friska's)")
+
             user_embedding = await openai.create_embeddings(
                 input=[user_msg_txt_for_embedding],
-                model="text-embedding-3-small",
+                model="text-embedding-3-large",
                 dimensions=embeddings_dimension,
             )
             result = annoy_index.query(user_embedding[0].embedding, n=1)[0]
             paragraph = paragraphs_by_uuid[result.userdata]
             if paragraph:
+                logger.info(len(paragraph))
                 logger.info(f"Enriching with RAG: {paragraph}")
+                
                 rag_msg = llm.ChatMessage.create(
                     text="Context:\n" + paragraph,
                     role="assistant",
@@ -164,23 +174,29 @@ class EntryDriver:
                 #chat_ctx.messages[-1] = rag_msg
                 #chat_ctx.messages.append(user_msg)
 
-                modified_text = paragraph + "\n" + pre_txt + user_msg.content + post_txt
+                modified_user_content = user_msg.content.replace("Hallo", "Hello")
+                modified_user_content = modified_user_content.replace("Halo", "Hello")
+                modified_user_content = modified_user_content.replace("halo", "hello")
+                modified_user_content = modified_user_content.replace("HALO", "Hello")
+                print("xxxxxxxxxxxxxxxxx")
+                print(len(user_msg_txt_for_embedding))
+                if (len(user_msg_txt_for_embedding) < 10):
+                    paragraph = ""
+                if (len(paragraph) < 50):
+                    paragraph = ""
+
+                modified_text = "Context:" + paragraph + "\n\n" + pre_txt + modified_user_content + post_txt
+                logger.info(modified_text)
                 chat_ctx.messages[-1].content = modified_text
-                
-                
 
             #logger.info(f"rag_msg: {rag_msg}")
             #logger.info(f"chat_ctx.messages[-1]: {chat_ctx.messages[-1]}")
             #return agent.llm.chat(chat_ctx=chat_ctx)
             
-            
-
-
-        
 
         # 创建 VoiceSettings 对象
         voice_settings = elevenlabs.VoiceSettings(
-            stability=0.4, 
+            stability=0.8, 
             similarity_boost=0.5, 
             style=0.2, 
             use_speaker_boost=True
@@ -200,16 +216,20 @@ class EntryDriver:
             vad=silero.VAD.load(),
             stt=openai.STT.with_groq(language="yue", detect_language=False, api_key=grop_key), #only with grop cloud that can use large-v3 to use cantonese
             allow_interruptions = False,
-            llm=openai.LLM(model=model_id),
+            llm=openai.LLM(),
             tts=elevenlabs.TTS(voice=custom_voice, encoding="pcm_24000"),
             before_llm_cb=_enrich_with_rag,
             before_tts_cb=before_tts_cb  # 传递自定义的 before_tts_cb 回调
         )
 
+        # 订阅 user_stopped_speaking 事件
+        self.agent.on("user_stopped_speaking", self.on_user_stopped_speaking)
+        self.agent.on("agent_stopped_speaking", self.on_agent_stopped_speaking)
+
         #self.agent.stt.is_mute = True  # Initialize as muted
 
         self.agent.start(ctx.room)
-        await self.agent.say("Hey, language test today?", allow_interruptions=True)
+        await self.agent.say("Hi, me Friska.", allow_interruptions=True)
 
         # 讓 OSC 服務器在新的執行緒中運行
         # Start OSC server if not already running
@@ -219,7 +239,17 @@ class EntryDriver:
         else:
             logger.info("OSC server is already running. Skipping startup.")
 
-       
+    def on_user_stopped_speaking(self):
+            """Handle the user_stopped_speaking event and send OSC signal."""
+            if self.is_speakbtn_hold == False:
+                logger.info("User stopped speaking. Sending /endspeech OSC signal.")
+                self.osc_client.send_message("/userstop", "User has stopped speaking")
+    def on_agent_stopped_speaking(self):
+            """Handle the user_stopped_speaking event and send OSC signal."""
+            logger.info("User stopped speaking. Sending /endspeech OSC signal.")
+            self.osc_client.send_message("/agentstop", "User has stopped speaking")
+
+
     def start_osc_server(self):
         # 配置 OSC 分派器
         disp = dispatcher.Dispatcher()
@@ -269,6 +299,7 @@ class EntryDriver:
         logger.info("Received /hold OSC message!")
         
         if self.agent is not None:
+            self.is_speakbtn_hold = True
             self.agent.set_speakbtn_status(True)
             print("self.agent." + str(self.agent.is_speakbtn_hold))
 
@@ -278,6 +309,7 @@ class EntryDriver:
         logger.info("Received /release OSC message!")
         
         if self.agent is not None:
+            self.is_speakbtn_hold = False
             self.agent.set_speakbtn_status(False)
             print("self.agent." + str(self.agent.is_speakbtn_hold))
 
