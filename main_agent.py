@@ -46,6 +46,7 @@ class EntryDriver:
 
         # 创建 OSC 客户端，目标地址为 localhost:5567
         self.osc_client = udp_client.SimpleUDPClient("127.0.0.1", 5567)
+        self.osc_client_unity = udp_client.SimpleUDPClient("192.168.0.139", 5008)
 
         self.is_speakbtn_hold = False
     
@@ -90,6 +91,9 @@ class EntryDriver:
                     if tone_match:
                         response_tone = tone_match.group(1).strip()
                         print(f"Response Tone: {response_tone}")
+                        # 发送 OSC 消息到 /tone 地址 to unity
+                        self.osc_client_unity.send_message("/tone", str(response_tone))
+                        logger.info(f"Tone sent to Unity: {response_tone}")
                         buffer = buffer.split("%", 2)[-1]  # 移除已处理的部分
 
                 # 检查是否能捕获 Response English
@@ -136,7 +140,7 @@ class EntryDriver:
     
         
         pre_txt = "User input: "
-        post_txt = r"\n\n1. Topic categorization [#related or partially related or unrelated#]:  \n2. Response tone [%happy or sad or confused or neutral%]: \n3. Response [@english@]:\n4. Translation of the response [$traditional chinese$]:"
+        post_txt = r"\n\n1. Topic categorization: #<categorization>#  \n2. Response tone: %<tone>% \n3. Response: @<response_in_english>@\n4. Translation of the response: $<translation_in_traditional chinese>$  "
 
         async def _enrich_with_rag(agent: VoicePipelineAgent, chat_ctx: llm.ChatContext):
             stt_text = chat_ctx.messages[-1].content
@@ -146,7 +150,12 @@ class EntryDriver:
             modified_stt_text = stt_text.replace("Hallo", "Hello")
             modified_stt_text = modified_stt_text.replace("Halo", "Hello")
             modified_stt_text = modified_stt_text.replace("halo", "hello")
+            modified_stt_text = modified_stt_text.replace("HALOU", "Hello")
             modified_stt_text = modified_stt_text.replace("HALO", "Hello")
+            modified_stt_text = modified_stt_text.replace("Halóo", "Hello")
+            modified_stt_text = modified_stt_text.replace("Haló", "Hello")
+            modified_stt_text = modified_stt_text.replace("Hai", "Hi")
+            modified_stt_text = modified_stt_text.replace(" hai", " hi")
 
             # 发送 OSC 消息到 /chi 地址
             self.osc_client.send_message("/input", str(modified_stt_text).strip())
@@ -175,10 +184,15 @@ class EntryDriver:
                 #chat_ctx.messages.append(user_msg)
 
                 modified_user_content = user_msg.content.replace("Hallo", "Hello")
+                modified_user_content = modified_user_content.replace("HALOU", "Hello")
                 modified_user_content = modified_user_content.replace("Halo", "Hello")
                 modified_user_content = modified_user_content.replace("halo", "hello")
                 modified_user_content = modified_user_content.replace("HALO", "Hello")
-                print("xxxxxxxxxxxxxxxxx")
+                modified_user_content = modified_user_content.replace("Halóo", "Hello")
+                modified_user_content = modified_user_content.replace("Haló", "Hello")
+                modified_user_content = modified_user_content.replace("Hai", "Hi")
+                modified_user_content = modified_user_content.replace(" hai", " hi")
+                
                 print(len(user_msg_txt_for_embedding))
                 if (len(user_msg_txt_for_embedding) < 10):
                     paragraph = ""
@@ -204,7 +218,7 @@ class EntryDriver:
 
         # 创建 Voice 对象，设置 voice_id 和 voice_settings
         custom_voice = elevenlabs.Voice(
-            id= "RlaD7H3pU627G2ZMcap7", #"5n8M7Ryj4WGvIblBxL83", # nagative "VkFD1gkULGl3924FMA5K",  # 替换为你的 voice_id
+            id= "JynqRycyCzSl9z1XWfvQ", # "lrHiVh9PuBpBiiTBXkHF", #"RlaD7H3pU627G2ZMcap7", #"5n8M7Ryj4WGvIblBxL83", # nagative "VkFD1gkULGl3924FMA5K",  # 替换为你的 voice_id
             name="Sad Voice",
             category="general",
             settings=voice_settings
