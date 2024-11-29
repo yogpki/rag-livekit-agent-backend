@@ -69,63 +69,102 @@ class EntryDriver:
             buffer = ""  # 用于累积 chunk
             response_chi = ""
             response_eng = ""
+            categorization = None
+            response_tone = None
 
             async for chunk in tts_source:
-                #chunk = chunk.strip()  # 去掉多余的空白字符
                 if not chunk:
                     continue
 
-                buffer += chunk  # 将当前 chunk 添加到缓冲区
+                
+                buffer += chunk
 
                 # 检查是否能捕获 Categorization
-                if ": #" in buffer:
-                    categorization_match = re.search(r"#(.*?)#", buffer)
-                    if categorization_match:
-                        categorization = categorization_match.group(1).strip()
-                        print(f"Categorization: {categorization}")
-                        buffer = buffer.split("#", 2)[-1]  # 移除已处理的部分
+                if categorization is None and "#" in buffer:
+                    while True:  # 持续尝试捕获下一个 # # 之间的内容
+                        categorization_match = re.search(r"#(.*?)#", buffer)
+                        if categorization_match:
+                            categorization = categorization_match.group(1).strip()
+
+                            # 检查是否包含 "related"
+                            if "related" not in categorization:
+                                print(f"Skipped Categorization without 'related': '{categorization}'")
+                                buffer = buffer.split("#", 2)[-1]
+                                continue
+                            else:
+                                # 捕获到正确的 categorization
+                                print(f"Valid Categorization: {categorization}")
+                                buffer = buffer.split("#", 2)[-1]
+                                break
+                        else:
+                            break
 
                 # 检查是否能捕获 Response Tone
-                if ": %" in buffer:
-                    tone_match = re.search(r"%(.*?)%", buffer)
-                    if tone_match:
-                        response_tone = tone_match.group(1).strip()
-                        print(f"Response Tone: {response_tone}")
-                        # 发送 OSC 消息到 /tone 地址 to unity
-                        self.osc_client_unity.send_message("/tone", str(response_tone))
-                        logger.info(f"Tone sent to Unity: {response_tone}")
-                        buffer = buffer.split("%", 2)[-1]  # 移除已处理的部分
+                if categorization and response_tone is None and "%" in buffer:
+                    while True:
+                        tone_match = re.search(r"%(.*?)%", buffer)
+                        if tone_match:
+                            response_tone = tone_match.group(1).strip()
+
+                            # 检查是否包含 "tone"
+                            if "tone" in response_tone.lower():
+                                print(f"Skipped Tone containing 'tone': '{response_tone}'")
+                                buffer = buffer.split("%", 2)[-1]
+                                continue
+                            else:
+                                print(f"Valid Response Tone: {response_tone}")
+                                self.osc_client_unity.send_message("/tone", str(response_tone))
+                                logger.info(f"Tone sent to Unity: {response_tone}")
+                                buffer = buffer.split("%", 2)[-1]
+                                break
+                        else:
+                            break
 
                 # 检查是否能捕获 Response English
-                if ": @" in buffer:
+                if categorization and response_tone and "@" in buffer:
                     response_eng_match = re.search(r"@(.*?)@", buffer, re.DOTALL)
                     if response_eng_match:
                         response_eng = response_eng_match.group(1).strip()
                         print(f"Response English: {response_eng}")
+                        buffer = buffer.split("@", 2)[-1]
 
-                        buffer = buffer.split("@", 2)[-1]  # 移除已处理的部分
                         # Yield 逐块返回英文响应
                         for line in response_eng.splitlines():
                             yield line.strip()
 
                 # 检查是否能捕获 Response Chinese
-                if ": $" in buffer:
+                if categorization and response_tone and response_eng and "$" in buffer:
                     response_chi_match = re.search(r"\$(.*?)\$", buffer, re.DOTALL)
                     if response_chi_match:
                         response_chi = response_chi_match.group(1).strip()
                         print(f"Response Chinese: {response_chi}")
                         
                         # 发送 OSC 消息到 /response 地址
-                        self.osc_client.send_message("/response", str(response_eng+"\n"+response_chi))
-                        self.osc_client_unity.send_message("/response", str(response_eng+"\n"+response_chi))
+                        self.osc_client.send_message("/response", str(response_eng + "\n" + response_chi))
+                        self.osc_client_unity.send_message("/response", str(response_eng + "\n" + response_chi))
+                        buffer = buffer.split("$", 2)[-1]
 
-                        buffer = buffer.split("$", 2)[-1]  # 移除已处理的部分
+            # 如果未捕获到 Response English，设置默认值
+            if not response_eng:
+                categorization = "unrelated"
+                response_tone = "neutral"
+                response_eng = "Friska not hear clear. Can you say again?"
+                response_chi = "Friska沒有聽清，你可以再説一次嗎？"
 
+                print(f"Default Values Applied: Categorization={categorization}, Tone={response_tone}, Response Eng={response_eng}, Response Chi={response_chi}")
+
+                self.osc_client.send_message("/response", str(response_eng + "\n" + response_chi))
+                self.osc_client_unity.send_message("/response", str(response_eng + "\n" + response_chi))
+                self.osc_client_unity.send_message("/tone", "confused")
                 
+                response_eng = re.sub(r"[#@&￥]", "", response_eng)
+                for line in response_eng.splitlines():
+                    yield line.strip()
 
             # 打印缓冲区中剩余的未处理内容（如果有的话）
             if buffer.strip():
                 print(f"Unprocessed Buffer: {buffer.strip()}")
+
 
 
 
@@ -212,7 +251,7 @@ class EntryDriver:
 
         # 创建 VoiceSettings 对象
         voice_settings = elevenlabs.VoiceSettings(
-            stability=0.8, 
+            stability=0.1, 
             similarity_boost=0.5, 
             style=0.2, 
             use_speaker_boost=True
