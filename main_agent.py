@@ -117,6 +117,7 @@ class EntryDriver:
                         
                         # 发送 OSC 消息到 /response 地址
                         self.osc_client.send_message("/response", str(response_eng+"\n"+response_chi))
+                        self.osc_client_unity.send_message("/response", str(response_eng+"\n"+response_chi))
 
                         buffer = buffer.split("$", 2)[-1]  # 移除已处理的部分
 
@@ -159,6 +160,7 @@ class EntryDriver:
 
             # 发送 OSC 消息到 /chi 地址
             self.osc_client.send_message("/input", str(modified_stt_text).strip())
+            self.osc_client_unity.send_message("/input", str(modified_stt_text).strip())
 
             # RAG retrieval and context update logic
             user_msg = chat_ctx.messages[-1]
@@ -218,7 +220,7 @@ class EntryDriver:
 
         # 创建 Voice 对象，设置 voice_id 和 voice_settings
         custom_voice = elevenlabs.Voice(
-            id= "JynqRycyCzSl9z1XWfvQ", # "lrHiVh9PuBpBiiTBXkHF", #"RlaD7H3pU627G2ZMcap7", #"5n8M7Ryj4WGvIblBxL83", # nagative "VkFD1gkULGl3924FMA5K",  # 替换为你的 voice_id
+            id="JynqRycyCzSl9z1XWfvQ", # "0sTSlluslryPZcmMqZuZ", , # "lrHiVh9PuBpBiiTBXkHF", #"RlaD7H3pU627G2ZMcap7", #"5n8M7Ryj4WGvIblBxL83", # nagative "VkFD1gkULGl3924FMA5K",  # 替换为你的 voice_id
             name="Sad Voice",
             category="general",
             settings=voice_settings
