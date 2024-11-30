@@ -27,7 +27,6 @@ system_prompt_path = 'data/system_prompt.txt'
 with open(system_prompt_path, 'r', encoding='utf-8') as file:
     system_prompt = file.read()
 
-
 try:
     with(open("keys.json")) as fp:
         key_dict = json.load(fp)
@@ -42,7 +41,6 @@ class EntryDriver:
         self.agent = None  # Initialize agent attribute
         self.ctx = None  # Store JobContext for potential reinitialization
         self.osc_server_running = False  # Flag to track OSC server status
-        
 
         # 创建 OSC 客户端，目标地址为 localhost:5567
         self.osc_client = udp_client.SimpleUDPClient("127.0.0.1", 5567)
@@ -50,7 +48,6 @@ class EntryDriver:
 
         self.is_speakbtn_hold = False
     
-
     async def entrypoint(self, ctx: JobContext):
         # Store context to use in reset
         self.ctx = ctx
@@ -196,6 +193,8 @@ class EntryDriver:
             modified_stt_text = modified_stt_text.replace("Haló", "Hello")
             modified_stt_text = modified_stt_text.replace("Hai", "Hi")
             modified_stt_text = modified_stt_text.replace(" hai", " hi")
+            modified_stt_text = modified_stt_text.replace("Fisca", "Friska")
+            modified_stt_text = modified_stt_text.replace("Frisca", "Friska")
 
             # 发送 OSC 消息到 /chi 地址
             self.osc_client.send_message("/input", str(modified_stt_text).strip())
@@ -233,6 +232,8 @@ class EntryDriver:
                 modified_user_content = modified_user_content.replace("Haló", "Hello")
                 modified_user_content = modified_user_content.replace("Hai", "Hi")
                 modified_user_content = modified_user_content.replace(" hai", " hi")
+                modified_user_content = modified_user_content.replace("Fisca", "Friska")
+                modified_user_content = modified_user_content.replace("Frisca", "Friska")
                 
                 print(len(user_msg_txt_for_embedding))
                 if (len(user_msg_txt_for_embedding) < 10):
@@ -280,6 +281,7 @@ class EntryDriver:
         # 订阅 user_stopped_speaking 事件
         self.agent.on("user_stopped_speaking", self.on_user_stopped_speaking)
         self.agent.on("agent_stopped_speaking", self.on_agent_stopped_speaking)
+        self.agent.on("user_started_speaking", self.on_user_started_speaking)
 
         #self.agent.stt.is_mute = True  # Initialize as muted
 
@@ -303,6 +305,9 @@ class EntryDriver:
             """Handle the user_stopped_speaking event and send OSC signal."""
             logger.info("User stopped speaking. Sending /endspeech OSC signal.")
             self.osc_client.send_message("/agentstop", "User has stopped speaking")
+    def on_user_started_speaking(self):
+        #send osc to unity to trigger listening animation
+        self.osc_client_unity.send_message("/listen", [1])
 
 
     def start_osc_server(self):
