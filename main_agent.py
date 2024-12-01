@@ -260,7 +260,7 @@ class EntryDriver:
 
         # 创建 Voice 对象，设置 voice_id 和 voice_settings
         custom_voice = elevenlabs.Voice(
-            id="JynqRycyCzSl9z1XWfvQ", # "0sTSlluslryPZcmMqZuZ", , # "lrHiVh9PuBpBiiTBXkHF", #"RlaD7H3pU627G2ZMcap7", #"5n8M7Ryj4WGvIblBxL83", # nagative "VkFD1gkULGl3924FMA5K",  # 替换为你的 voice_id
+            id="JynqRycyCzSl9z1XWfvQ", #suci-u2b: "FZ8EqBA9DZ2GlefbqTYz", # suci: "JynqRycyCzSl9z1XWfvQ", # "0sTSlluslryPZcmMqZuZ", , # "lrHiVh9PuBpBiiTBXkHF", #"RlaD7H3pU627G2ZMcap7", #"5n8M7Ryj4WGvIblBxL83", # nagative "VkFD1gkULGl3924FMA5K",  # 替换为你的 voice_id
             name="Sad Voice",
             category="general",
             settings=voice_settings
