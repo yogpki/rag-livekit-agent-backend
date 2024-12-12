@@ -44,7 +44,7 @@ class EntryDriver:
 
         # 创建 OSC 客户端，目标地址为 localhost:5567
         self.osc_client = udp_client.SimpleUDPClient("127.0.0.1", 5567)
-        self.osc_client_unity = udp_client.SimpleUDPClient("192.168.0.139", 5008)
+        self.osc_client_unity = udp_client.SimpleUDPClient("192.168.8.27", 5008)
 
         self.is_speakbtn_hold = False
     
@@ -138,7 +138,7 @@ class EntryDriver:
                         
                         # 发送 OSC 消息到 /response 地址
                         self.osc_client.send_message("/response", str(response_eng + "\n" + response_chi))
-                        self.osc_client_unity.send_message("/response", str(response_eng + "\n" + response_chi))
+                        self.osc_client_unity.send_message("/response", str(response_chi))
                         buffer = buffer.split("$", 2)[-1]
 
             # 如果未捕获到 Response English，设置默认值
@@ -191,10 +191,16 @@ class EntryDriver:
             modified_stt_text = modified_stt_text.replace("HALO", "Hello")
             modified_stt_text = modified_stt_text.replace("Halóo", "Hello")
             modified_stt_text = modified_stt_text.replace("Haló", "Hello")
+            modified_stt_text = modified_stt_text.replace("haló", "hello")
             modified_stt_text = modified_stt_text.replace("Hai", "Hi")
             modified_stt_text = modified_stt_text.replace(" hai", " hi")
             modified_stt_text = modified_stt_text.replace("Fisca", "Friska")
             modified_stt_text = modified_stt_text.replace("Frisca", "Friska")
+           # modified_stt_text = modified_stt_text.replace("Hmmm", "")
+            #modified_stt_text = modified_stt_text.replace("hmmm", "")
+           # modified_stt_text = modified_stt_text.replace("嗯", "")
+            #modified_stt_text = modified_stt_text.replace("呵呵", "")
+            
 
             # 发送 OSC 消息到 /chi 地址
             self.osc_client.send_message("/input", str(modified_stt_text).strip())
@@ -230,10 +236,16 @@ class EntryDriver:
                 modified_user_content = modified_user_content.replace("HALO", "Hello")
                 modified_user_content = modified_user_content.replace("Halóo", "Hello")
                 modified_user_content = modified_user_content.replace("Haló", "Hello")
+                modified_user_content = modified_user_content.replace("haló", "hello")
                 modified_user_content = modified_user_content.replace("Hai", "Hi")
                 modified_user_content = modified_user_content.replace(" hai", " hi")
                 modified_user_content = modified_user_content.replace("Fisca", "Friska")
                 modified_user_content = modified_user_content.replace("Frisca", "Friska")
+                #modified_user_content = modified_user_content.replace("Hmmm", "")
+                #modified_user_content = modified_user_content.replace("hmmm", "")
+                #modified_user_content = modified_user_content.replace("嗯", "")
+                #modified_user_content = modified_user_content.replace("呵呵", "")
+                
                 
                 print(len(user_msg_txt_for_embedding))
                 if (len(user_msg_txt_for_embedding) < 10):
@@ -252,7 +264,7 @@ class EntryDriver:
 
         # 创建 VoiceSettings 对象
         voice_settings = elevenlabs.VoiceSettings(
-            stability=0.1, 
+            stability=0.6, 
             similarity_boost=0.5, 
             style=0.2, 
             use_speaker_boost=True
@@ -260,7 +272,7 @@ class EntryDriver:
 
         # 创建 Voice 对象，设置 voice_id 和 voice_settings
         custom_voice = elevenlabs.Voice(
-            id="JynqRycyCzSl9z1XWfvQ", #suci-u2b: "FZ8EqBA9DZ2GlefbqTYz", # suci: "JynqRycyCzSl9z1XWfvQ", # "0sTSlluslryPZcmMqZuZ", , # "lrHiVh9PuBpBiiTBXkHF", #"RlaD7H3pU627G2ZMcap7", #"5n8M7Ryj4WGvIblBxL83", # nagative "VkFD1gkULGl3924FMA5K",  # 替换为你的 voice_id
+            id="yoUsTs4hf0a8NQ79GsEF", # #suci-u2b: "FZ8EqBA9DZ2GlefbqTYz", # suci: "JynqRycyCzSl9z1XWfvQ", # "0sTSlluslryPZcmMqZuZ", , # "lrHiVh9PuBpBiiTBXkHF", #"RlaD7H3pU627G2ZMcap7", #"5n8M7Ryj4WGvIblBxL83", # nagative "VkFD1gkULGl3924FMA5K",  # 替换为你的 voice_id
             name="Sad Voice",
             category="general",
             settings=voice_settings
