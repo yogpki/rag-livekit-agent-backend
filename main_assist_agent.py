@@ -267,6 +267,11 @@ class EntryDriver:
             stt_text = stt_text.replace("Frisca", "Friska")
             stt_text = stt_text.replace("fuck", "??")
             stt_text = stt_text.replace("Fuck", "??")
+            stt_text = stt_text.replace("ni hao", "你好")
+            stt_text = stt_text.replace("Ni hao", "你好")
+            stt_text = stt_text.replace("星星", "猩猩")
+            stt_text = stt_text.replace("Frisco", "Friska")
+            stt_text = stt_text.replace("Fresco", "Friska")
 
                  # 发送 OSC 消息到 /chi 地址
             self.osc_client.send_message("/input", str(stt_text).strip())
@@ -316,7 +321,8 @@ class EntryDriver:
         self.agent = VoicePipelineAgent(
             chat_ctx=initial_ctx,
             vad=silero.VAD.load(),
-            stt=openai.STT.with_groq(language="yue", detect_language=False, api_key=grop_key), #only with grop cloud that can use large-v3 to use cantonese
+            #stt=openai.STT.with_groq(language="yue", detect_language=False, api_key=grop_key), #only with grop cloud that can use large-v3 to use cantonese
+            stt=openai.STT(),
             allow_interruptions = False,
             llm=AssistantLLM(
             assistant_opts=AssistantOptions(
@@ -384,7 +390,8 @@ class EntryDriver:
         logger.info("Received /mand OSC message!")
         # Run reset asynchronously
         if self.agent is not None and self.agent.stt is not None:
-            self.agent.stt._stt._opts.language = "zh"  
+            #self.agent.stt._stt._opts.language = "zh"  
+            #self.agent.stt._stt._opts.language = "zh"  
             logger.info("self.agent.stt._opts.language = zh")
             print("self.agent.stt._opts.language = zh")
     
@@ -393,7 +400,8 @@ class EntryDriver:
         logger.info("Received /can OSC message!")
         # Run reset asynchronously
         if self.agent is not None and self.agent.stt is not None:
-            self.agent.stt._stt._opts.language = "yue"  
+            #self.agent.stt._stt._opts.language = "yue"  
+            #self.agent.stt._stt._opts.language = "zh-HK"  
             logger.info("self.agent.stt._opts.language = yue")
             print("self.agent.stt._opts.language = yue")
 
